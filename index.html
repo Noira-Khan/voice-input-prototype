@@ -12,13 +12,13 @@ box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:en
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5}
-.wrap{max-width:980px;margin:0 auto;padding:24px 16px 40px}
+.wrap{max-width:420px;margin:0 auto;padding:24px 16px 32px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.restart{font:inherit;font-size:.78rem;background:none;border:0;color:var(--mute);cursor:pointer;text-decoration:underline;padding:4px 8px}
+.phone.buzz{animation:shake .3s}
+@keyframes shake{20%{transform:translateX(-3px)}40%{transform:translateX(3px)}60%{transform:translateX(-2px)}80%{transform:translateX(2px)}}
+.mic.pulse{animation:micpulse .6s 2}
+@keyframes micpulse{50%{box-shadow:0 0 0 12px rgba(30,140,122,.28)}}
 h1{font-size:clamp(1.5rem,4vw,2.2rem);margin:0 0 4px;font-weight:800;letter-spacing:-.02em}
-.sub{color:var(--mute);margin:0 0 20px;max-width:60ch}
-.steps{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:22px}
-.step{font-size:.78rem;padding:5px 10px;border-radius:99px;border:1px solid var(--line);color:var(--mute);background:var(--card)}
-.step.on{background:var(--indigo);color:#fff;border-color:var(--indigo);font-weight:600}
-.step.done{border-color:var(--teal);color:var(--teal)}
 .main{display:grid;grid-template-columns:minmax(300px,360px) 1fr;gap:32px;align-items:start}
 @media(max-width:760px){.main{grid-template-columns:1fr}}
 .phone{width:100%;max-width:360px;height:660px;margin:0 auto;background:#fff;border:10px solid var(--indigo);border-radius:38px;position:relative;overflow:hidden;color:#241a4d;display:flex;flex-direction:column}
@@ -48,93 +48,58 @@ h1{font-size:clamp(1.5rem,4vw,2.2rem);margin:0 0 4px;font-weight:800;letter-spac
 .send{background:var(--teal);color:#fff;border:0;border-radius:99px;padding:13px;font:inherit;font-weight:800;font-size:1rem;cursor:pointer}
 .toast{position:absolute;left:14px;right:14px;bottom:76px;background:var(--indigo);color:#fff;border-radius:14px;padding:11px 14px;font-size:.84rem;animation:pop .3s}
 .toast em{color:var(--amber);font-style:normal}
-.vib{position:absolute;top:44px;right:14px;font-size:.75rem;background:var(--coral);color:#fff;border-radius:99px;padding:3px 10px;opacity:0;transition:opacity .15s}
-.vib.on{opacity:1}
-.notes{display:flex;flex-direction:column;gap:10px}
-.notes h2{font-size:1.05rem;margin:0 0 2px}
-.note{color:#fff;border-radius:12px;padding:11px 14px;font-size:.9rem}
-.t{background:var(--teal)}.a{background:#c98a0b}.c{background:#d9461f}
-.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;font-size:.88rem;color:var(--mute)}
-.panel b{color:var(--ink)}
-.row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
-.row button{font:inherit;font-size:.85rem;padding:8px 14px;border-radius:99px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Quiet push-to-talk for ChatGPT</h1>
-  <p class="sub">Interactive prototype of the chosen direction: hold the mic like a WhatsApp voice note, speak softly, review silently, then send. Built for the 52% who feel awkward talking to their phone in public.</p>
-  <div class="steps" id="steps"></div>
-  <div class="main">
-    <div>
-      <div class="phone" id="phone"></div>
-    </div>
-    <div class="notes" id="notes"></div>
-  </div>
+  <div class="phone" id="phone"></div>
+  <button class="restart" onclick="reset()">Restart</button>
 </div>
 <script>
-var STEPS=["Types a long prompt","Sees privacy nudge","Holds mic","Speaks softly","Reviews transcript","Sends"];
 var PROMPT="Explain compound interest with an example in simple Hindi for my brother";
 var S={scr:"chat",typed:"",nudge:false,words:[],text:"",streak:1,msgs:[],toast:false,step:0,typing:null,held:false,t0:0,iv:null};
-var NOTES={
-chat:[["t","Mic icon stays in its familiar place. No relearning needed."],["a","Copy leads with privacy (\u2018no one has to hear\u2019), naming the validated barrier."],["c","The nudge shows only when typing is long or slow, not every session, to avoid nagging."]],
-rec:[["t","Whisper-tuned mic sensitivity. Works at low volume, no need to raise your voice."],["a","Transcript stays dimmed while recording, so no one can read along over the shoulder."],["c","No audible \u2018listening\u2019 tone. Start and stop are haptic only."]],
-review:[["a","Misheard a word? Edit the text silently. Never re-speak out loud."],["t","Explicit confirm step. Nothing is sent until you tap Send."],["c","Post-use reinforcement and streak nudge repeat use without another cold trigger."]]};
 var AIREPLY="Compound interest ka matlab hai byaaj par bhi byaaj. Maan lo tum \u20B910,000 ek saal ke liye 10% par rakhte ho: pehle saal ke baad \u20B911,000 ho jaate hain. Doosre saal 10% \u20B911,000 par lagta hai, yaani \u20B91,100, aur total \u20B912,100 ho jaata hai. Simple interest mein sirf \u20B912,000 hote.";
 function $(i){return document.getElementById(i)}
-function buzz(){try{navigator.vibrate&&navigator.vibrate(30)}catch(e){}var v=$("vib");if(v){v.classList.add("on");setTimeout(function(){v.classList.remove("on")},350)}}
+function buzz(){var p=$("phone");if(p){p.classList.remove("buzz");void p.offsetWidth;p.classList.add("buzz")}try{navigator.vibrate&&navigator.vibrate(30)}catch(e){}var v=$("vib");if(v){v.classList.add("on");setTimeout(function(){v.classList.remove("on")},350)}}
+function mask(a){return a.map(function(w){return "\u2022".repeat(Math.max(2,Math.min(w.length,7)))}).join(" ")}
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;")}
 function render(){
-  $("steps").innerHTML=STEPS.map(function(s,i){return '<span class="step '+(i===S.step?"on":i<S.step?"done":"")+'">'+(i+1)+". "+s+"</span>"}).join("");
-  var key=S.scr;var n=NOTES[key];
-  $("notes").innerHTML='<h2>'+({chat:"Screen 1: Discovery, contextual voice nudge",rec:"Screen 2: Quiet push-to-talk recording",review:"Screen 3: Silent review and repeat-use nudge"})[key]+'</h2>'+n.map(function(x){return '<div class="note '+x[0]+'">'+x[1]+'</div>'}).join("")+
-  '<div class="panel"><b>Why this works:</b> the only new interaction is hold-to-talk, a gesture Indian users already trust from WhatsApp. Every other step reuses a pattern ChatGPT already has.</div>'+
-  '<div class="row"><button onclick="reset()">Restart demo</button></div>';
-  var h='<div class="status"><span>9:41</span><span>5G</span></div><div class="vib" id="vib">haptic buzz</div>';
+  var h='<div class="status"><span>9:41</span><span>5G</span></div>';
   if(S.scr==="chat"){
     h+='<div class="hdr">ChatGPT</div><div class="body" id="body">';
-    if(!S.msgs.length&&!S.typed)h+='<div class="empty">Ask anything. Tip: tap <b>Type a long prompt</b> below to see the nudge appear.</div>';
+    if(!S.msgs.length&&!S.typed)h+='<div class="empty">Ask anything</div>';
     S.msgs.forEach(function(m){h+='<div class="bub '+m.w+'">'+esc(m.t)+'</div>'});
-    if(S.nudge)h+='<button class="nudge" onclick="tryMic()">Try voice: quick, <b>no one has to hear</b></button>';
+    if(S.nudge)h+='<button class="nudge" onclick="tryMic()">Long message? Hold the mic and say it. <b>You\u2019ll review before it sends.</b></button>';
     h+='</div>';
-    if(S.toast)h+='<div class="toast">Voice worked, even here.<br><em>Try it again next time.</em><br>\u2B50 '+S.streak+'-day voice streak</div>';
-    h+='<div style="padding:0 14px 6px;display:flex;gap:8px"><button style="font:inherit;font-size:.75rem;padding:5px 10px;border-radius:99px;border:1px solid #ddd7ec;background:#fff;color:#241a4d;cursor:pointer" onclick="autoType()">Type a long prompt</button></div>'+
-    '<div class="bar"><input id="inp" placeholder="Type a message..." value="'+esc(S.typed)+'" oninput="onInp(this.value)"><button class="mic" id="mic" aria-label="Hold to speak">\uD83C\uDF99</button></div>';
+    if(S.toast)h+='<div class="toast">Voice worked.<br><em>Try it again next time.</em><br>\u2B50 '+S.streak+'-day voice streak</div>';
+    h+='<div class="bar"><input id="inp" placeholder="Type a message..." value="'+esc(S.typed)+'" oninput="onInp(this.value)"><button class="mic" id="mic" aria-label="Hold to speak">\uD83C\uDF99</button></div>';
   }else if(S.scr==="rec"){
-    h+='<div class="hint" style="padding:4px 18px">Hold mic to speak softly...</div><div class="rec"><div class="dim" id="dim">'+esc(S.words.join(" "))+'</div><div class="big">\uD83C\uDF99</div><div class="wave" id="wave">'+'<i></i>'.repeat(9)+'</div><div class="hint">low-volume waveform. Release to stop.</div></div><div class="hint" style="padding:0 18px 20px">\uD83D\uDCF3 Haptic buzz only, no sound chime</div>';
+    h+='<div class="hint" style="padding:4px 18px">Hold to talk</div><div class="rec"><div class="dim" id="dim">'+mask(S.words)+'</div><div class="big">\uD83C\uDF99</div><div class="wave" id="wave">'+'<i></i>'.repeat(9)+'</div><div class="hint">Release to send \u00b7 Slide up to cancel</div></div><div style="padding:0 18px 20px"></div>';
   }else{
-    h+='<div class="hdr">Review before sending</div><div class="rev"><textarea id="ta" aria-label="Transcript">'+esc(S.text)+'</textarea><button class="send" onclick="send()">Send</button><div class="hint">Edit any word silently. Nothing is sent until you tap Send.</div></div>';
+    h+='<div class="hdr">Review before sending</div><div class="rev"><textarea id="ta" aria-label="Transcript">'+esc(S.text)+'</textarea><button class="send" onclick="send()">Send</button><div class="hint">Edit anything before you send.</div></div>';
   }
   $("phone").innerHTML=h;
   var mic=$("mic");if(mic){mic.onpointerdown=startRec;}
 }
 function onInp(v){S.typed=v;S.step=v?0:S.step;if(v.length>25&&!S.nudge){S.nudge=true;S.step=1;render();var i=$("inp");i.focus();i.setSelectionRange(v.length,v.length)}}
-function autoType(){
-  if(S.typing)return;S.typed="";S.nudge=false;S.step=0;var i=0;
-  S.typing=setInterval(function(){
-    i++;S.typed=PROMPT.slice(0,i);var inp=$("inp");if(inp)inp.value=S.typed;
-    if(i>=32&&!S.nudge){S.nudge=true;S.step=1;render()}
-    if(i>=PROMPT.length){clearInterval(S.typing);S.typing=null}
-  },90);
-}
-function tryMic(){var b=$("body");if(b){var h=document.createElement("div");h.className="hint";h.textContent="Press and hold the mic button below.";b.appendChild(h)}}
+function tryMic(){var m=$("mic");if(m){m.classList.remove("pulse");void m.offsetWidth;m.classList.add("pulse");setTimeout(function(){m.classList.remove("pulse")},1300)}}
 function startRec(e){
   e.preventDefault();clearInterval(S.typing);S.typing=null;
-  S.scr="rec";S.words=[];S.step=2;S.t0=Date.now();S.held=true;buzz();render();
+  S.scr="rec";S.words=[];S.step=2;S.t0=Date.now();S.held=true;S.y0=e.clientY;buzz();render();
   var all=PROMPT.split(" ");
   S.iv=setInterval(function(){
     S.step=3;
     if(S.words.length<all.length)S.words.push(all[S.words.length]);
-    var d=$("dim");if(d)d.textContent=S.words.join(" ");
+    var d=$("dim");if(d)d.textContent=mask(S.words);
     var w=$("wave");if(w)Array.prototype.forEach.call(w.children,function(b){b.style.height=(6+Math.random()*(S.words.length<all.length?22:4))+"px"});
-    var st=$("steps");
   },260);
   document.addEventListener("pointerup",stopRec,{once:true});
   document.addEventListener("pointercancel",stopRec,{once:true});
 }
-function stopRec(){
+function stopRec(e){
   if(!S.held)return;S.held=false;clearInterval(S.iv);buzz();
+  if(e&&e.clientY!==undefined&&S.y0-e.clientY>60){S.scr="chat";S.words=[];S.step=0;render();return}
   if(S.words.length<3){S.scr="chat";S.nudge=true;S.step=1;render();tryMic();return}
   S.text=S.words.join(" ");S.scr="review";S.step=4;render();
 }
