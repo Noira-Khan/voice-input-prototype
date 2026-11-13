@@ -5,6 +5,7 @@ Run: streamlit run app.py
 
 from __future__ import annotations
 
+import html
 import json
 import random
 from datetime import date, datetime, timedelta, timezone
@@ -25,10 +26,10 @@ MIC = components.declare_component(
 )
 
 st.set_page_config(
-    page_title="Quiet Voice Mode",
-    page_icon="🎙️",
+    page_title="ChatGPT",
+    page_icon="💬",
     layout="centered",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 
@@ -36,27 +37,74 @@ def inject_css() -> None:
     st.markdown(
         """
         <style>
-          @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
-          html, body, [class*="css"] { font-family: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif; }
-          .stApp { background: #faf8f5; color: #2b2060; }
-          section.main > div.block-container { max-width: 460px; padding-top: 1.2rem; }
-          [data-testid="stSidebar"] { background: #ffffff; border-right: 1px solid #e3def0; }
-          [data-testid="stSidebar"] * { color: #2b2060; }
-          div[data-testid="stChatMessage"] { background: transparent; }
-          .qv-kicker { color: #6b6585; font-size: 0.82rem; letter-spacing: 0.04em; text-transform: uppercase; margin: 0; }
-          .qv-title { font-size: 1.7rem; font-weight: 800; margin: 0 0 0.2rem; }
-          .qv-card { background: #2b2060; color: white; border-radius: 16px; padding: 14px 14px 12px; margin: 8px 0 12px; }
-          .qv-card b { color: #f0b429; }
-          .qv-card p { margin: 0 0 6px; color: white; }
-          .qv-card small { color: #d9d4ea; }
-          .qv-win { background: #2b2060; color: white; border-radius: 16px; padding: 12px 14px; margin: 8px 0; }
-          .qv-win em { color: #f0b429; font-style: normal; display: block; }
-          .qv-blur { filter: blur(7px); user-select: none; background: #efebf7; border-radius: 12px; padding: 12px; }
-          .qv-transcript { background: #efebf7; border-radius: 12px; padding: 12px; font-size: 1.05rem; line-height: 1.45; }
-          .qv-steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
-          .qv-steps span { background: white; border: 1px solid #e3def0; border-radius: 999px; padding: 4px 8px; font-size: 0.75rem; color: #6b6585; }
-          .qv-steps span.on { background: #f5683a; border-color: #f5683a; color: white; font-weight: 700; }
-          div[data-testid="stButton"] button { border-radius: 999px; }
+          html, body, [class*="css"] {
+            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+          }
+          .stApp { background: #ffffff; color: #0d0d0d; }
+          header[data-testid="stHeader"] { background: rgba(255,255,255,.85); }
+          section.main > div.block-container { max-width: 760px; padding-top: .4rem; }
+          [data-testid="stSidebar"] { background: #f9f9f9; border-right: 1px solid #ececec; }
+          footer { visibility: hidden; }
+          .gpt-top { text-align: center; padding: 4px 0 18px; }
+          .gpt-name { font-weight: 650; font-size: 1.05rem; letter-spacing: -0.01em; }
+          .gpt-sub { color: #8e8ea0; font-size: .8rem; margin-top: 2px; }
+          .gpt-empty { text-align: center; padding: 16vh 12px 6vh; }
+          .gpt-mark {
+            width: 42px; height: 42px; border-radius: 50%; background: #0d0d0d; margin: 0 auto 14px;
+          }
+          .gpt-mark.sm { width: 28px; height: 28px; margin: 2px 0 0; flex: none; }
+          .gpt-empty h2 { font-weight: 480; font-size: 1.7rem; margin: 0; letter-spacing: -0.02em; }
+          .gpt-user-row { display: flex; justify-content: flex-end; margin: 14px 0; }
+          .gpt-user {
+            max-width: min(80%, 520px);
+            background: #f4f4f4;
+            color: #0d0d0d;
+            border-radius: 22px;
+            padding: 10px 16px;
+            line-height: 1.5;
+          }
+          .gpt-ai { display: flex; gap: 14px; align-items: flex-start; margin: 18px 0 4px; }
+          .gpt-ai-body { line-height: 1.6; padding-top: 2px; }
+          .gpt-suggest {
+            border: 1px solid #ececec;
+            border-radius: 18px;
+            padding: 12px 14px;
+            margin: 12px 0;
+            background: #fff;
+          }
+          .gpt-suggest strong { display: block; margin-bottom: 4px; }
+          .gpt-suggest p, .gpt-suggest small { margin: 0; color: #6e6e80; }
+          .gpt-note { color: #6e6e80; font-size: .95rem; margin: 4px 0 12px 42px; }
+          .gpt-screen-title { font-size: 1.25rem; font-weight: 600; margin: 8px 0 4px; letter-spacing: -0.02em; }
+          .gpt-muted { color: #8e8ea0; font-size: .9rem; margin-bottom: 10px; }
+          .gpt-blur {
+            filter: blur(8px); user-select: none; background: #f4f4f4;
+            border-radius: 22px; padding: 14px 16px;
+          }
+          .gpt-transcript {
+            background: #f4f4f4; border-radius: 22px; padding: 14px 16px;
+            font-size: 1.02rem; line-height: 1.5;
+          }
+          section.main [data-testid="stBaseButton-primary"] {
+            background: #0d0d0d; color: #fff; border: none; border-radius: 999px;
+          }
+          section.main [data-testid="stBaseButton-secondary"] {
+            background: #fff; color: #0d0d0d; border: 1px solid #e5e5e5; border-radius: 999px;
+          }
+          section.main [data-testid="stTextInput"] input {
+            border-radius: 26px;
+            border: 1px solid #e3e3e3;
+            background: #fff;
+            min-height: 52px;
+            padding-left: 18px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.04);
+          }
+          section.main [data-testid="stTextArea"] textarea {
+            border-radius: 16px;
+            border: 1px solid #e5e5e5;
+            background: #fff;
+          }
+          div[data-testid="stAlert"] { border-radius: 14px; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -499,40 +547,44 @@ def render_sidebar() -> None:
     st.sidebar.button("Reset everything", on_click=request_reset, use_container_width=True)
 
 
-def render_steps() -> None:
-    screen = st.session_state.screen
-    current = {
-        "chat": 0,
-        "language": 1,
-        "listen": 2,
-        "review": 3,
-    }.get(screen, 4 if st.session_state.show_win else 0)
-    labels = ["Prompt", "Language", "Whisper", "Review", "Answer"]
-    html = "".join(f'<span class="{"on" if index == current else ""}">{label}</span>' for index, label in enumerate(labels))
-    st.markdown(f'<div class="qv-steps">{html}</div>', unsafe_allow_html=True)
+def render_header() -> None:
+    language = event_language()
+    subtitle = f'<div class="gpt-sub">{html.escape(LANGS[language]["label"])}</div>' if language else ""
+    st.markdown(
+        f'<div class="gpt-top"><div class="gpt-name">ChatGPT</div>{subtitle}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def render_thread() -> None:
     if not st.session_state.messages:
-        with st.chat_message("assistant"):
-            st.write(text("hello"))
+        st.markdown(
+            f'<div class="gpt-empty"><div class="gpt-mark"></div><h2>{html.escape(text("empty_title"))}</h2></div>',
+            unsafe_allow_html=True,
+        )
+        return
     for index, message in enumerate(st.session_state.messages):
-        with st.chat_message(message["role"]):
-            st.markdown(message["text"].replace("\n", "  \n"))
-            if message["role"] == "assistant" and st.button(text("listen"), key=f"listen-{index}"):
-                speak(message["text"])
+        body = html.escape(message["text"]).replace("\n", "<br>")
+        if message["role"] == "user":
+            st.markdown(f'<div class="gpt-user-row"><div class="gpt-user">{body}</div></div>', unsafe_allow_html=True)
+            continue
+        st.markdown(
+            f'<div class="gpt-ai"><div class="gpt-mark sm"></div><div class="gpt-ai-body">{body}</div></div>',
+            unsafe_allow_html=True,
+        )
+        if st.button(text("listen"), key=f"listen-{index}"):
+            speak(message["text"])
 
 
 def render_win() -> None:
     if not st.session_state.show_win:
         return
-    streak = st.session_state.streak
     st.markdown(
-        f'<div class="qv-win"><strong>{text("worked")}</strong><em>{text("worked_next")}</em>⭐ {streak} {text("streak")}</div>',
+        f'<div class="gpt-note">{html.escape(text("worked"))} · {st.session_state.streak} {html.escape(text("streak"))}<br>{html.escape(text("worked_next"))}</div>',
         unsafe_allow_html=True,
     )
     if st.session_state.comfort_open:
-        st.write(text("comfort"))
+        st.caption(text("comfort"))
         awkward, okay, comfortable = st.columns(3)
         awkward.button(text("awkward"), on_click=answer_comfort, args=("awkward",), use_container_width=True)
         okay.button(text("okay"), on_click=answer_comfort, args=("okay",), use_container_width=True)
@@ -543,22 +595,23 @@ def render_chat() -> None:
     render_thread()
     if prompt_visible():
         st.markdown(
-            f'<div class="qv-card"><p><b>{text("prompt_title")}</b></p><p>{text("prompt_body")}</p><small>Shown once. Never forced.</small></div>',
+            f'<div class="gpt-suggest"><strong>{html.escape(text("prompt_title"))}</strong><p>{html.escape(text("prompt_body"))}</p></div>',
             unsafe_allow_html=True,
         )
         left, right = st.columns(2)
         left.button(text("tap_try"), type="primary", on_click=accept_prompt, use_container_width=True)
         right.button(text("not_now"), on_click=dismiss_prompt, use_container_width=True)
     render_win()
-    st.text_input("Message", key="draft", label_visibility="collapsed", placeholder=text("placeholder"))
-    send, mic = st.columns([1, 1])
-    send.button(text("send"), type="primary", on_click=send_typed, use_container_width=True)
-    mic.button(text("mic"), on_click=open_mic, use_container_width=True)
+    field, mic = st.columns([8, 1.2])
+    field.text_input("Message", key="draft", label_visibility="collapsed", placeholder=text("placeholder"))
+    mic.button("🎤", help=text("mic"), on_click=open_mic, use_container_width=True)
+    if (st.session_state.get("draft") or "").strip():
+        st.button(text("send"), type="primary", on_click=send_typed, use_container_width=True)
 
 
 def render_language() -> None:
-    st.subheader(text("pick_title"))
-    st.caption(text("beta_note"))
+    st.markdown(f'<div class="gpt-screen-title">{html.escape(text("pick_title"))}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="gpt-muted">{html.escape(text("beta_note"))}</div>', unsafe_allow_html=True)
     for code, meta in LANGS.items():
         label = f"{meta['label']} · {meta['english']}" + (" · beta" if meta["beta"] else "")
         st.button(label, key=f"pick-{code}", on_click=pick_language, args=(code,), use_container_width=True)
@@ -567,9 +620,10 @@ def render_language() -> None:
 
 def render_listen() -> None:
     quiet = st.session_state.version == "B"
-    st.subheader(text("hold_title") if quiet else text("classic_title"))
+    title = text("hold_title") if quiet else text("classic_title")
+    st.markdown(f'<div class="gpt-screen-title">{html.escape(title)}</div>', unsafe_allow_html=True)
     if LANGS[effective_lang()]["beta"]:
-        st.caption(text("beta_note"))
+        st.markdown(f'<div class="gpt-muted">{html.escape(text("beta_note"))}</div>', unsafe_allow_html=True)
     transcript, alts = demo_payload()
     strings = {key: text(key) for key in ("listening", "hold_hint", "cancel_hint", "hidden_note", "buzz_note", "classic_hint", "unsupported", "mic")}
     event = MIC(
@@ -598,8 +652,8 @@ def render_review() -> None:
     if not review:
         st.session_state.screen = "chat"
         st.rerun()
-    st.subheader(text("review_title"))
-    st.caption(text("review_hint"))
+    st.markdown(f'<div class="gpt-screen-title">{html.escape(text("review_title"))}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="gpt-muted">{html.escape(text("review_hint"))}</div>', unsafe_allow_html=True)
     hidden = st.checkbox(text("hide"), key="hide_text")
     if st.session_state.hide_text_prev is not None and hidden != st.session_state.hide_text_prev:
         log("hide_text_toggled", hidden=bool(hidden))
@@ -607,10 +661,10 @@ def render_review() -> None:
     shown = " ".join(review["words"])
     review["text"] = shown
     if hidden:
-        st.markdown(f'<div class="qv-blur">{shown}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="gpt-blur">{html.escape(shown)}</div>', unsafe_allow_html=True)
         st.caption(text("show"))
     else:
-        st.markdown(f'<div class="qv-transcript">{shown}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="gpt-transcript">{html.escape(shown)}</div>', unsafe_allow_html=True)
         fixes = [index for index, options in enumerate(review["alts"]) if len(options) > 1]
         for index in fixes:
             word = review["words"][index]
@@ -657,13 +711,10 @@ def main() -> None:
     maybe_log_nudge()
     render_sidebar()
     sync_language()
-    st.markdown('<p class="qv-kicker">Research prototype · Milestone 3</p>', unsafe_allow_html=True)
-    st.markdown('<p class="qv-title">Quiet Voice Mode</p>', unsafe_allow_html=True)
-    st.caption("A simulated ChatGPT mobile screen for regional-language users who already know voice, and stop using it around other people.")
-    render_steps()
+    render_header()
     flash = st.session_state.pop("flash", None)
     if flash:
-        st.info(flash)
+        st.toast(flash)
     screen = st.session_state.screen
     if screen == "language":
         render_language()

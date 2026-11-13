@@ -7,17 +7,17 @@
   :root { color-scheme: light; }
   html, body { margin: 0; background: transparent; }
   body {
-    font-family: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
-    color: #2b2060;
+    font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+    color: #0d0d0d;
   }
   .pad { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 8px 8px 4px; }
   .note {
     width: 100%;
-    background: #efebf7;
-    border-radius: 12px;
+    background: #f4f4f4;
+    border-radius: 16px;
     padding: 10px 12px;
-    color: #6b6585;
-    font-size: 12px;
+    color: #6e6e80;
+    font-size: 13px;
     text-align: center;
   }
   .live {
@@ -27,24 +27,24 @@
     text-align: center;
     letter-spacing: 0.01em;
   }
-  .live.hidden { letter-spacing: 3px; color: #a59fc0; font-weight: 500; }
+  .live.hidden { letter-spacing: 3px; color: #8e8ea0; font-weight: 500; }
   .ring {
     width: 148px;
     height: 148px;
     border-radius: 50%;
-    background: #dfe7ee;
+    background: #f4f4f4;
     display: grid;
     place-items: center;
     transition: transform 160ms ease, background 160ms ease;
   }
-  .pad.rec .ring { transform: scale(1.06); background: #cde9e3; }
-  .pad.cx .ring { background: #f8d9d2; }
+  .pad.rec .ring { transform: scale(1.06); background: #ececec; }
+  .pad.cx .ring { background: #f8d7d7; }
   button.mic {
     width: 96px;
     height: 96px;
     border: 0;
     border-radius: 50%;
-    background: #1d8c7a;
+    background: #0d0d0d;
     color: white;
     display: grid;
     place-items: center;
@@ -53,11 +53,11 @@
     user-select: none;
     -webkit-user-select: none;
   }
-  button.mic:focus-visible { outline: 3px solid #f0b429; outline-offset: 3px; }
+  button.mic:focus-visible { outline: 3px solid #0d0d0d; outline-offset: 3px; }
   button.mic svg { width: 34px; height: 34px; fill: white; }
   .wv { display: flex; gap: 5px; height: 26px; align-items: center; }
   .wv i {
-    width: 8px; height: 8px; border-radius: 2px; background: #f0b429; display: block;
+    width: 4px; height: 8px; border-radius: 99px; background: #0d0d0d; display: block;
   }
   .pad.rec .wv i { animation: wave 0.7s ease-in-out infinite alternate; }
   .wv i:nth-child(2n) { animation-delay: 0.12s; }
@@ -67,16 +67,16 @@
     .pad.rec .wv i { animation: none; height: 16px; }
     .ring { transition: none; }
   }
-  .hint { min-height: 18px; font-size: 13px; color: #6b6585; text-align: center; }
-  .pad.cx .hint { color: #9a3412; font-weight: 700; }
+  .hint { min-height: 18px; font-size: 14px; color: #6e6e80; text-align: center; }
+  .pad.cx .hint { color: #b42318; font-weight: 650; }
   .chip {
-    background: #efebf7;
+    background: #f4f4f4;
     border-radius: 999px;
     padding: 8px 12px;
     font-size: 12px;
-    color: #2b2060;
+    color: #0d0d0d;
   }
-  .pad.rec .chip { background: #f0b429; }
+  .pad.rec .chip { background: #ececec; }
   .warn { color: #9a3412; font-size: 12px; text-align: center; margin: 0; }
 </style>
 </head>
