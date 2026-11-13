@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root { color-scheme: light; }
+  html, body { margin: 0; background: transparent; }
+  body {
+    font-family: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
+    color: #2b2060;
+  }
+  .pad { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 8px 8px 4px; }
+  .note {
+    width: 100%;
+    background: #efebf7;
+    border-radius: 12px;
+    padding: 10px 12px;
+    color: #6b6585;
+    font-size: 12px;
+    text-align: center;
+  }
+  .live {
+    min-height: 22px;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: center;
+    letter-spacing: 0.01em;
+  }
+  .live.hidden { letter-spacing: 3px; color: #a59fc0; font-weight: 500; }
+  .ring {
+    width: 148px;
+    height: 148px;
+    border-radius: 50%;
+    background: #dfe7ee;
+    display: grid;
+    place-items: center;
+    transition: transform 160ms ease, background 160ms ease;
+  }
+  .pad.rec .ring { transform: scale(1.06); background: #cde9e3; }
+  .pad.cx .ring { background: #f8d9d2; }
+  button.mic {
+    width: 96px;
+    height: 96px;
+    border: 0;
+    border-radius: 50%;
+    background: #1d8c7a;
+    color: white;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  button.mic:focus-visible { outline: 3px solid #f0b429; outline-offset: 3px; }
+  button.mic svg { width: 34px; height: 34px; fill: white; }
+  .wv { display: flex; gap: 5px; height: 26px; align-items: center; }
+  .wv i {
+    width: 8px; height: 8px; border-radius: 2px; background: #f0b429; display: block;
+  }
+  .pad.rec .wv i { animation: wave 0.7s ease-in-out infinite alternate; }
+  .wv i:nth-child(2n) { animation-delay: 0.12s; }
+  .wv i:nth-child(3n) { animation-delay: 0.24s; }
+  @keyframes wave { to { height: 24px; } }
+  @media (prefers-reduced-motion: reduce) {
+    .pad.rec .wv i { animation: none; height: 16px; }
+    .ring { transition: none; }
+  }
+  .hint { min-height: 18px; font-size: 13px; color: #6b6585; text-align: center; }
+  .pad.cx .hint { color: #9a3412; font-weight: 700; }
+  .chip {
+    background: #efebf7;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #2b2060;
+  }
+  .pad.rec .chip { background: #f0b429; }
+  .warn { color: #9a3412; font-size: 12px; text-align: center; margin: 0; }
+</style>
+</head>
+<body>
+  <div class="pad" id="pad">
+    <div class="note" id="note"></div>
+    <div class="live" id="live"></div>
+    <div class="ring"><button class="mic" id="mic" type="button"></button></div>
+    <div class="wv" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="hint" id="hint"></div>
+    <div class="chip" id="chip"></div>
+    <p class="warn" id="warn" hidden></p>
+  </div>
+  <script>
+    const MIC_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V22h2v-3.08A7 7 0 0 0 19 12z"/></svg>';
+
+    function send(type, data) {
+      window.parent.postMessage(Object.assign({ isStreamlitMessage: true, type: type }, data || {}), "*");
+    }
+
+    let args = { mode: "quiet", demo: true, strings: {}, transcript: "", alts: [], bcp47: "en-IN", noisy: false };
+    let holding = false;
+    let pointerId = null;
+    let startY = 0;
+    let startedAt = 0;
+    let cancelArmed = false;
+    let recognition = null;
+    let finalText = "";
+    let interim = "";
+    let nbest = [];
+    let wantResult = false;
+    let peakLevel = null;
+    let revealTimer = null;
+
+    const pad = document.getElementById("pad");
+    const mic = document.getElementById("mic");
+    const live = document.getElementById("live");
+    const hint = document.getElementById("hint");
+    const note = document.getElementById("note");
+    const chip = document.getElementById("chip");
+    const warn = document.getElementById("warn");
+    mic.innerHTML = MIC_SVG;
+
+    function strings() { return args.strings || {}; }
+    function isQuiet() { return args.mode !== "classic"; }
+    function hasRecognizer() {
+      return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    }
+
+    function paint() {
+      const s = strings();
+      mic.setAttribute("aria-label", s.mic || "Microphone");
+      if (isQuiet()) {
+        note.textContent = s.hidden_note || "";
+        chip.textContent = s.buzz_note || "";
+        if (!holding) hint.textContent = s.hold_hint || "";
+        live.className = "live hidden";
+        if (!holding) live.textContent = "•••• ••• ••••";
+      } else {
+        note.textContent = s.classic_hint || "";
+        chip.textContent = "Live text";
+        if (!holding) hint.textContent = s.classic_hint || "";
+        live.className = "live";
+        if (!holding) live.textContent = "";
+      }
+      const unsupported = !args.demo && !hasRecognizer();
+      warn.hidden = !unsupported;
+      warn.textContent = unsupported ? (s.unsupported || "") : "";
+      send("streamlit:setFrameHeight", { height: Math.ceil(document.body.scrollHeight) + 8 });
+    }
+
+    function buzz() {
+      try { if (navigator.vibrate) navigator.vibrate(18); } catch (err) { /* desktop */ }
+    }
+
+    function beep() {
+      try {
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = 880;
+        gain.gain.value = 0.03;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12);
+        osc.stop(ctx.currentTime + 0.13);
+        osc.onended = () => ctx.close();
+      } catch (err) { /* autoplay or missing audio */ }
+    }
+
+    function emit(payload) {
+      send("streamlit:setComponentValue", { value: payload, dataType: "json" });
+    }
+
+    function stopReveal() {
+      if (revealTimer) clearInterval(revealTimer);
+      revealTimer = null;
+    }
+
+    function startDemoReveal() {
+      if (!args.demo || isQuiet()) return;
+      const words = String(args.transcript || "").split(/\s+/).filter(Boolean);
+      let shown = 0;
+      revealTimer = setInterval(() => {
+        shown = Math.min(words.length, shown + 1);
+        live.textContent = words.slice(0, shown).join(" ");
+        if (shown >= words.length) stopReveal();
+      }, 160);
+    }
+
+    function ensureRecognizer() {
+      const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!Ctor) return null;
+      if (!recognition) {
+        recognition = new Ctor();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 3;
+        recognition.onresult = (event) => {
+          interim = "";
+          for (let i = event.resultIndex; i < event.results.length; i += 1) {
+            const result = event.results[i];
+            if (result.isFinal) {
+              finalText = `${finalText} ${result[0].transcript}`.trim();
+              nbest = Array.from(result).map((alt) => alt.transcript);
+            } else {
+              interim += result[0].transcript;
+            }
+          }
+          if (!isQuiet()) live.textContent = `${finalText} ${interim}`.trim();
+        };
+        recognition.onerror = () => {};
+        recognition.onend = () => {
+          if (!wantResult) return;
+          wantResult = false;
+          const transcript = `${finalText} ${interim}`.trim();
+          const ended = Date.now();
+          emit({
+            id: crypto.randomUUID(),
+            type: transcript ? "result" : "error",
+            transcript: transcript,
+            alternatives: nbest,
+            alts: [],
+            latencyMs: Math.max(0, ended - startedAt),
+            speechLevel: peakLevel,
+            startedAt: startedAt,
+            message: transcript ? "" : (strings().unsupported || "No speech heard"),
+          });
+        };
+      }
+      recognition.lang = args.bcp47 || "en-IN";
+      return recognition;
+    }
+
+    function begin(y) {
+      if (holding) return;
+      holding = true;
+      cancelArmed = false;
+      startY = y;
+      startedAt = Date.now();
+      finalText = "";
+      interim = "";
+      nbest = [];
+      peakLevel = null;
+      wantResult = false;
+      pad.classList.add("rec");
+      pad.classList.remove("cx");
+      hint.textContent = strings().listening || "Listening";
+      if (isQuiet()) {
+        live.textContent = "•••• ••• ••••";
+        buzz();
+      } else {
+        live.textContent = "";
+        beep();
+      }
+      if (args.demo) {
+        startDemoReveal();
+      } else {
+        const rec = ensureRecognizer();
+        if (!rec) {
+          holding = false;
+          pad.classList.remove("rec", "cx");
+          emit({
+            id: crypto.randomUUID(),
+            type: "error",
+            message: strings().unsupported || "Speech recognition is unavailable",
+            startedAt: startedAt,
+          });
+          paint();
+          return;
+        }
+        try { rec.start(); } catch (err) { /* already started */ }
+      }
+      paint();
+    }
+
+    function move(y) {
+      if (!holding || !isQuiet()) return;
+      cancelArmed = startY - y > 70;
+      pad.classList.toggle("cx", cancelArmed);
+      hint.textContent = cancelArmed ? (strings().cancel_hint || "Release to cancel") : (strings().listening || "Listening");
+    }
+
+    function endGesture(forceCancel) {
+      const wasHolding = holding;
+      const tooShort = wasHolding && (Date.now() - startedAt < 500);
+      const cancelled = forceCancel || cancelArmed;
+      holding = false;
+      pad.classList.remove("rec", "cx");
+      stopReveal();
+      if (!wasHolding) return;
+      if (!args.demo && recognition) {
+        if (cancelled || tooShort) {
+          wantResult = false;
+          try { recognition.abort(); } catch (err) { /* ignore */ }
+        } else {
+          wantResult = true;
+          try { recognition.stop(); } catch (err) { wantResult = false; }
+        }
+      }
+      if (cancelled) {
+        if (!isQuiet()) beep();
+        emit({
+          id: crypto.randomUUID(),
+          type: "cancel",
+          startedAt: startedAt,
+          speechLevel: peakLevel,
+        });
+        paint();
+        return;
+      }
+      if (tooShort) {
+        emit({ id: crypto.randomUUID(), type: "too_short", startedAt: startedAt });
+        paint();
+        return;
+      }
+      if (args.demo) {
+        if (isQuiet()) buzz();
+        else beep();
+        emit({
+          id: crypto.randomUUID(),
+          type: "result",
+          transcript: args.transcript || "",
+          alts: args.alts || [],
+          alternatives: [],
+          latencyMs: 140 + Math.floor(Math.random() * 220),
+          speechLevel: args.noisy ? 68 : 16,
+          startedAt: startedAt,
+        });
+      }
+      paint();
+    }
+
+    mic.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      mic.setPointerCapture(event.pointerId);
+      pointerId = event.pointerId;
+      if (!isQuiet() && holding) {
+        endGesture(false);
+        return;
+      }
+      begin(event.clientY);
+    });
+    mic.addEventListener("pointermove", (event) => move(event.clientY));
+    function pointerEnd(event) {
+      if (pointerId != null && event.pointerId !== pointerId) return;
+      pointerId = null;
+      if (!isQuiet()) return;
+      endGesture(false);
+    }
+    mic.addEventListener("pointerup", pointerEnd);
+    mic.addEventListener("pointercancel", () => endGesture(true));
+    mic.addEventListener("contextmenu", (event) => event.preventDefault());
+    mic.addEventListener("keydown", (event) => {
+      if (event.repeat) return;
+      if (event.key === "Escape" && holding) {
+        cancelArmed = true;
+        endGesture(true);
+      } else if (event.key === " " || event.key === "Enter") {
+        event.preventDefault();
+        if (!isQuiet() && holding) endGesture(false);
+        else begin(0);
+      }
+    });
+    mic.addEventListener("keyup", (event) => {
+      if (!isQuiet()) return;
+      if (event.key === " " || event.key === "Enter") {
+        event.preventDefault();
+        endGesture(false);
+      }
+    });
+
+    let renderSeen = false;
+    window.addEventListener("message", (event) => {
+      const data = event.data || {};
+      if (data.type !== "streamlit:render") return;
+      renderSeen = true;
+      const next = data.args || {};
+      if (next.epoch !== args.epoch && holding) endGesture(true);
+      args = next;
+      if (!holding) paint();
+    });
+
+    const readyTimer = setInterval(() => {
+      if (renderSeen) {
+        clearInterval(readyTimer);
+        return;
+      }
+      send("streamlit:componentReady", { apiVersion: 1 });
+    }, 150);
+    send("streamlit:componentReady", { apiVersion: 1 });
+    paint();
+  </script>
+</body>
+</html>
