@@ -401,7 +401,7 @@ SAMPLES = {
         },
         {
             "q": "Explain compound interest with a simple example",
-            "keywords": ["compound", "interest", "byaaj"],
+            "keywords": ["compound", "interest", "byaaj", "byaj"],
             "a": "Compound interest means interest on the interest too. ₹10,000 at 10% becomes ₹11,000 after one year. Next year the 10% applies to ₹11,000, so you end at ₹12,100. Simple interest would stop at ₹12,000.",
         },
     ],
@@ -428,7 +428,7 @@ SAMPLES = {
         },
         {
             "q": "चक्रवृद्धि ब्याज आसान उदाहरण से समझाओ",
-            "keywords": ["ब्याज", "चक्रवृद्धि", "compound", "interest"],
+            "keywords": ["ब्याज", "चक्रवृद्धि", "compound", "interest", "byaj", "byaaj"],
             "a": "चक्रवृद्धि ब्याज का मतलब है ब्याज पर भी ब्याज। ₹10,000 पर 10% से एक साल बाद ₹11,000 होते हैं। अगले साल 10% ₹11,000 पर लगता है, यानी कुल ₹12,100। साधारण ब्याज में ₹12,000 ही होते।",
         },
     ],
@@ -543,7 +543,7 @@ SAMPLES = {
         },
         {
             "q": "Compound interest ko simple example se samjhao",
-            "keywords": ["compound", "interest", "byaaj"],
+            "keywords": ["compound", "interest", "byaaj", "byaj", "chakravriddhi"],
             "a": "Compound interest ka matlab hai byaaj par bhi byaaj. ₹10,000 par 10% se ek saal baad ₹11,000 ho jaate hain. Agle saal 10% ₹11,000 par lagta hai, total ₹12,100. Simple interest mein ₹12,000 hi hote.",
         },
     ],

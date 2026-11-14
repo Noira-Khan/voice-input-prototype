@@ -57,6 +57,26 @@ class MatchTests(unittest.TestCase):
         self.assertIsNotNone(sample)
         self.assertIn("aloo", sample["a"].lower())
 
+    def test_near_paraphrase_still_answers(self):
+        sample, _questions, score = match_answer("en", "photosynthesis ko simple words mein samjha do")
+        self.assertIsNotNone(sample)
+        self.assertGreaterEqual(score, 0.34)
+        self.assertIn("photosynthesis", sample["a"].lower())
+
+    def test_near_hindi_wording_still_answers(self):
+        sample, _questions, _score = match_answer("hi", "प्रकाश संश्लेषण आसान भाषा में समझाओ")
+        self.assertIsNotNone(sample)
+        self.assertIn("प्रकाश संश्लेषण", sample["a"])
+
+    def test_interest_said_a_different_way_still_answers(self):
+        sample, _questions, _score = match_answer("en", "chakravriddhi byaj samjhao")
+        self.assertIsNotNone(sample)
+        self.assertIn("interest", sample["a"].lower())
+
+    def test_small_talk_does_not_match(self):
+        sample, _questions, _score = match_answer("en", "hello how are you")
+        self.assertIsNone(sample)
+
     def test_unrelated_text_returns_the_sample_list(self):
         sample, questions, _score = match_answer("en", "book a train to pune")
         self.assertIsNone(sample)

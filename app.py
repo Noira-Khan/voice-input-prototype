@@ -48,7 +48,11 @@ def inject_css() -> None:
           .gpt-top { text-align: center; padding: 4px 0 18px; }
           .gpt-name { font-weight: 650; font-size: 1.05rem; letter-spacing: -0.01em; }
           .gpt-sub { color: #8e8ea0; font-size: .8rem; margin-top: 2px; }
-          .gpt-empty { text-align: center; padding: 16vh 12px 6vh; }
+          .gpt-empty { text-align: center; padding: 18px 12px 8px; }
+          .gpt-suggest-label {
+            font-size: .78rem; font-weight: 650; letter-spacing: .02em;
+            color: #6e6e80; margin: 2px 0 6px;
+          }
           .gpt-mark {
             width: 42px; height: 42px; border-radius: 50%; background: #0d0d0d; margin: 0 auto 14px;
           }
@@ -203,6 +207,14 @@ def sync_language() -> None:
     if current != "unset" and current != previous:
         log("lang_picked", language=current)
     st.session_state.language_prev = current
+
+
+def ask_suggestion(language: str, question: str) -> None:
+    sample = next(item for item in SAMPLES[language] if item["q"] == question)
+    st.session_state.messages.append({"role": "user", "text": question, "channel": "sample"})
+    st.session_state.messages.append({"role": "assistant", "text": sample["a"], "channel": "sample"})
+    log("sample_question_picked", question=question)
+    log("answer_shown", channel="sample", matched=True)
 
 
 def answer_for(language: str, transcript: str) -> tuple[str, bool]:
@@ -601,7 +613,26 @@ def render_win() -> None:
         comfortable.button(text("comfortable"), on_click=answer_comfort, args=("comfortable",), use_container_width=True)
 
 
+def render_top_suggestions() -> None:
+    columns = st.columns(2)
+    for column, code in zip(columns, ("hi", "hinglish")):
+        with column:
+            st.markdown(
+                f'<div class="gpt-suggest-label">{html.escape(LANGS[code]["label"])}</div>',
+                unsafe_allow_html=True,
+            )
+            for index, sample in enumerate(SAMPLES[code]):
+                st.button(
+                    sample["q"],
+                    key=f"suggest-{code}-{index}",
+                    on_click=ask_suggestion,
+                    args=(code, sample["q"]),
+                    use_container_width=True,
+                )
+
+
 def render_chat() -> None:
+    render_top_suggestions()
     render_thread()
     if prompt_visible():
         st.markdown(
