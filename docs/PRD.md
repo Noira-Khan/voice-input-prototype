@@ -11,7 +11,7 @@ Helping regional-language ChatGPT mobile users move from trying voice once to us
 | Product launch | Still the Week 12 rollout in the plan below. This repo does not ship inside ChatGPT. |
 | Evidence | Milestone 2 survey + interviews (n = 27) |
 
-The earlier static phone walkthrough is replaced by this prototype. Reviewers can speak, or use demo speech, in Hindi, Marathi, Bengali, Tamil, Telugu, Hinglish, and English, then export the event log.
+The earlier static phone walkthrough is replaced by this prototype. It opens like a chat. Speech listens to the microphone first. Reviewers can speak in Hindi, Marathi, Bengali, Tamil, Telugu, Hinglish, and English, then export the event log. Demo speech is a fallback in the gear for a browser that has no recognizer.
 
 ## 1. Problem definition
 
@@ -70,9 +70,11 @@ WhatsApp voice notes already taught hold-to-record and slide-to-cancel in this m
 
 Hindi, Hinglish, and other regional-language ChatGPT mobile users, about 22% of India’s ChatGPT base (Zebracat, 2026). Absolute size still needs internal data. The prototype covers Hindi, Marathi, Bengali, Tamil, Telugu, Hinglish, and English. Regional interface copy is marked beta until a native speaker reviews it.
 
+The job to be done is not “find something to ask.” They already have a question. The job is to say it without feeling watched.
+
 Today: voice works at home, then the person hesitates at the mic on a bus, in class, or in an office, and types instead.
 
-With Quiet Voice Mode: they see one prompt, pick a language, hold and speak softly, check or hide the text, send, then get an answer, a streak, and a comfort check.
+With Quiet Voice Mode: the chat is what they see first. One prompt offers voice and can be refused. Two example questions sit under the message bar, one in Hindi and one in Hinglish, so a first send has an obvious success. They pick a language, hold and speak softly, check or hide the text, and send. A line that is only close to a sample still gets that answer. Then they see the answer, a streak, and a comfort check.
 
 What they still need: their own language rather than being pushed into English; a gesture that does not look like taking a call; confidence that nothing is readable or audible nearby before they send; a way to fix one misheard word without speaking again; a first try that is easy to refuse.
 
@@ -90,15 +92,29 @@ Direction C takes the quiet cues from A (hidden transcript, haptic, no chime) an
 
 The prompt appears when the app opens, which is the default in this prototype. The original “only after a long or slow draft” idea is still testable from the gear. It is not the default, because waiting for slow typing misses the people who never start typing the private query at all.
 
+### What the prototype must do
+
+These are the acceptance criteria for this build. They describe the research prototype, not the Week 12 ChatGPT client.
+
+| Requirement | Done when |
+| --- | --- |
+| The chat is the product | The opening screen is the conversation, the prompt, and the message bar. It does not open on a catalog of questions. |
+| A hint, not a menu | At most two suggestions, one Hindi and one Hinglish, and they sit under the message and microphone bar. |
+| The mic hears the person | A hold records what they say. The prototype does not replace that with a preset question. |
+| A near question still completes the loop | If the spoken line is clearly nearest a sample, including a shorter or slightly different wording, that sample’s answer is what they get. |
+| An unrelated line does not get an answer | Small talk and off-topic requests show the sample list for the active language. The prototype does not invent a reply. |
+| The comparison stays fair | Version A and Version B call the same matcher. A difference between arms is the voice flow. |
+| Comfort is measurable | The events in section 7 are enough to compute the guardrails and the public-setting retry illustration. |
+
 ### Flow
 
 Version B, Quiet push-to-talk:
 
-1. Chat opens. One prompt: “Try voice in your language”. “Not now” hides it for the session. It is never forced, and the mic still works after a dismissal.
-2. Language picker: Hindi, Marathi, Bengali, Tamil, Telugu, Hinglish, English. The interface and the recognizer follow the choice. Languages other than English are labeled beta.
-3. Hold to speak. Slide up to cancel. Space hold works from a keyboard. Words stay hidden. A short vibration replaces the start/stop chime. Cancel returns to the same quiet screen, so the next try is still voice rather than a fall back to the keyboard.
-4. Review opens before anything can send. Tap a misheard word to cycle the recognizer’s alternatives, or edit the whole line, or pick a sample question. “Hide text until I tap it” blurs the line for people looking at the screen. Re-record and discard are both available.
-5. Send. The answer is a fixed sample matched to the closest question. Anything else gets the list of samples, not a made-up answer.
+1. Chat opens. One prompt: “Try voice in your language”. “Not now” hides it for the session. It is never forced, and the mic still works after a dismissal. Under the message bar, two suggestions only. Tapping one asks that question. They are not the first thing on the screen, and they are not the full set.
+2. Language picker: Hindi, Marathi, Bengali, Tamil, Telugu, Hinglish, English. The interface and the recognizer follow the choice. Languages other than English are labeled beta. The picker appears the first time they use the mic, not before they have decided to speak.
+3. Hold to speak. The microphone listens. Slide up to cancel. Space hold works from a keyboard. Words stay hidden. A short vibration replaces the start/stop chime. Cancel returns to the same quiet screen, so the next try is still voice rather than a fall back to the keyboard.
+4. Review opens before anything can send. The transcript is what was heard. Tap a misheard word to cycle the recognizer’s alternatives, edit the whole line, or pick a sample question for the current language. “Hide text until I tap it” blurs the line for people looking at the screen. Re-record and discard are both available.
+5. Send. The answer is the nearest fixed sample when the line is close enough, including Hindi and Hinglish samples, because those are the hinted questions. Anything clearly unrelated gets the list of samples for the active language, not a made-up answer.
 6. “Voice worked, even here”, a day streak, and a one-tap comfort check. Listen reads the answer only after a tap.
 
 Version A, current voice, is the control:
@@ -114,7 +130,8 @@ Typing stays on the chat screen in both arms. The mic is the same control people
 
 - Review before send is mandatory in Version B and absent in Version A.
 - Word alternatives come from the browser recognizer’s n-best list when the hypotheses share a word count. Demo speech always mishears one word so the fix can be tried without a microphone.
-- Sample matching is shared by both arms. Small spelling differences still hit the intended answer. Production would keep ChatGPT’s real responses and delete this matcher.
+- Sample matching is shared by both arms. The search starts with the active language, then Hindi, Hinglish, and English. A close paraphrase counts. A line with no real overlap does not. Production would keep ChatGPT’s real responses and delete this matcher.
+- The two chips under the bar are a start, not the scope of the product. Hiding the rest of the catalog is intentional: a wall of questions teaches people they are in a demo, which is the wrong lesson for a comfort test.
 - Public-setting measurement is not a product behavior. The gear can mark a noisy place and earphones. The event stores a noise bucket, earphone status, and `public_setting_flag`. Real earphone detection and on-device noise classification are production work; the prototype simulates them so the metric can be traced.
 - A second microphone stream is not opened during real speech. On Chrome it fights the speech recognizer. Demo speech logs a stand-in level (low, or high when “noisy place” is on).
 - New data is an in-session event list. There is no new account schema and no audio file.
@@ -124,7 +141,10 @@ Typing stays on the chat screen in both arms. The mic is the same control people
 
 - The prompt leads with language, and the screen copy follows that language.
 - Seven languages, with fixed answers and a matcher, so a test is not stuck on one English sentence.
-- Real browser speech, with demo speech as the path that always works.
+- Real browser speech is the default. Demo speech remains for a browser with no recognizer.
+- The mic captures speech before any preset question is offered.
+- The opening screen is the chat. Two suggestions sit under the message bar. The full list does not.
+- A spoken line that is only near a sample still gets that answer. An unrelated line does not.
 - Hide-text, an event log, an A/B arm, and guardrail counts.
 - Cancel stays on the whisper screen.
 - Keyboard hold and a demo-release control, so the flow is usable without a perfect touch gesture.
@@ -172,7 +192,8 @@ The prototype’s public-retry count is a session illustration: a `voice_hold_st
 - Hide-text defaults off. The gear can default it on, which is the open test of privacy against readability.
 - Hold-to-speak has a keyboard equivalent (Space to hold, Escape to cancel) and a demo-release button so a failed gesture is not a dead end.
 - Regional copy and recognizers are beta. Do not treat a good demo in English as evidence that Tamil or Telugu is ready on a mid-range Android phone.
-- Sample answers will look confident and wrong if someone asks a real question outside the set. The unmatched state lists the samples instead of inventing an answer. This must not be confused with ChatGPT quality.
+- Sample answers will look confident and wrong if someone asks a real question outside the set. The unmatched state lists the samples instead of inventing an answer. A near-match can also attach the wrong sample when two questions share words. This must not be confused with ChatGPT quality.
+- Two suggestion chips can be read as “the product only answers these.” The copy and the review list have to keep the larger sample set available, and production deletes the chips with the matcher.
 - Streamlit session memory holds the event log until reset or timeout. Do not dictate passwords or other secrets into the prototype.
 
 ## 10. Launch plan for the product
@@ -205,6 +226,8 @@ Decisions:
 - Fixed sample answers in the prototype, so the arm comparison is not an answer-quality comparison.
 - The open-app prompt is the default. The slow-draft prompt remains a test arm in the gear.
 - Cancel stays on the whisper screen.
+- Do not lead with a question catalog. Two suggestions under the message bar are enough to start a successful send. The mic still has to hear the person, and a close wording of any sample still counts.
+- Real speech is the default. Demo speech is a researcher fallback, not the experience we are testing.
 
 Open:
 
@@ -212,5 +235,6 @@ Open:
 - Does soft speech degrade recognition enough to pull the whisper model forward? Week 4 decides.
 - Should hide-text be on by default?
 - Which regional languages ship first on mid-range Android, once real-device Listen voices and recognizers are measured?
+- Are two chips the right hint, or does even that pair teach people to tap instead of speak? Watch `sample_question_picked` against `send_tapped` with `channel=voice`.
 
 Descoped to a later version: whisper-tuned recognition, location-based shared-space detection, accent-model work, and making the slow-typing prompt the only trigger.
