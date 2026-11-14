@@ -110,6 +110,7 @@
     let wantResult = false;
     let peakLevel = null;
     let revealTimer = null;
+    let fatalError = "";
 
     const pad = document.getElementById("pad");
     const mic = document.getElementById("mic");
@@ -207,35 +208,51 @@
               interim += result[0].transcript;
             }
           }
-          if (!isQuiet()) live.textContent = `${finalText} ${interim}`.trim();
+          const heard = `${finalText} ${interim}`.trim();
+          if (!isQuiet()) live.textContent = heard;
+          else if (heard) hint.textContent = strings().hearing || strings().listening || "Listening";
         };
-        recognition.onerror = () => {};
+        recognition.onerror = (event) => {
+          const code = event.error || "";
+          if (code === "not-allowed" || code === "service-not-allowed" || code === "audio-capture") {
+            fatalError = code;
+          }
+        };
         recognition.onend = () => {
+          if (holding && !wantResult && !fatalError) {
+            try { recognition.start(); } catch (err) { /* restart after a browser pause */ }
+            return;
+          }
           if (!wantResult) return;
           wantResult = false;
-          const transcript = `${finalText} ${interim}`.trim();
-          const ended = Date.now();
-          emit({
-            id: crypto.randomUUID(),
-            type: transcript ? "result" : "error",
-            transcript: transcript,
-            alternatives: nbest,
-            alts: [],
-            latencyMs: Math.max(0, ended - startedAt),
-            speechLevel: peakLevel,
-            startedAt: startedAt,
-            message: transcript ? "" : (strings().unsupported || "No speech heard"),
-          });
+          emitHeard();
         };
       }
       recognition.lang = args.bcp47 || "en-IN";
       return recognition;
     }
 
+    function emitHeard() {
+      const transcript = `${finalText} ${interim}`.trim();
+      const ended = Date.now();
+      emit({
+        id: crypto.randomUUID(),
+        type: transcript ? "result" : "error",
+        transcript: transcript,
+        alternatives: nbest,
+        alts: [],
+        latencyMs: Math.max(0, ended - startedAt),
+        speechLevel: peakLevel,
+        startedAt: startedAt,
+        message: transcript ? "" : (strings().no_speech || "No speech heard"),
+      });
+    }
+
     function begin(y) {
       if (holding) return;
       holding = true;
       cancelArmed = false;
+      fatalError = "";
       startY = y;
       startedAt = Date.now();
       finalText = "";
@@ -278,7 +295,9 @@
       if (!holding || !isQuiet()) return;
       cancelArmed = startY - y > 70;
       pad.classList.toggle("cx", cancelArmed);
-      hint.textContent = cancelArmed ? (strings().cancel_hint || "Release to cancel") : (strings().listening || "Listening");
+      if (cancelArmed) hint.textContent = strings().cancel_hint || "Release to cancel";
+      else if (`${finalText} ${interim}`.trim()) hint.textContent = strings().hearing || strings().listening || "Listening";
+      else hint.textContent = strings().listening || "Listening";
     }
 
     function endGesture(forceCancel) {
@@ -289,13 +308,15 @@
       pad.classList.remove("rec", "cx");
       stopReveal();
       if (!wasHolding) return;
-      if (!args.demo && recognition) {
+      if (!args.demo) {
         if (cancelled || tooShort) {
           wantResult = false;
-          try { recognition.abort(); } catch (err) { /* ignore */ }
+          try { if (recognition) recognition.abort(); } catch (err) { /* ignore */ }
+        } else if (!recognition) {
+          emitHeard();
         } else {
           wantResult = true;
-          try { recognition.stop(); } catch (err) { wantResult = false; }
+          try { recognition.stop(); } catch (err) { wantResult = false; emitHeard(); }
         }
       }
       if (cancelled) {

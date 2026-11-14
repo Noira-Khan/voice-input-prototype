@@ -118,7 +118,7 @@ def init_state() -> None:
         "version": "B",
         "language_choice": "unset",
         "language_prev": "unset",
-        "speech_mode": "Demo",
+        "speech_mode": "Real",
         "noisy": False,
         "earphones": False,
         "hide_default": False,
@@ -142,10 +142,15 @@ def init_state() -> None:
         "flash": None,
         "hide_text": False,
         "hide_text_prev": False,
+        "mic_missed": False,
+        "speech_real_default": False,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
+    if not st.session_state.speech_real_default:
+        st.session_state.speech_mode = "Real"
+        st.session_state.speech_real_default = True
 
 
 def event_language() -> str | None:
@@ -200,13 +205,14 @@ def sync_language() -> None:
     st.session_state.language_prev = current
 
 
-def answer_for(language: str, transcript: str) -> str:
+def answer_for(language: str, transcript: str) -> tuple[str, bool]:
     sample, questions, _score = match_answer(language, transcript)
     if sample:
-        return sample["a"]
-    lines = [ui(language, "no_match_intro"), ""]
+        return sample["a"], True
+    heard = ui(language, "heard").replace("{text}", transcript)
+    lines = [heard, "", ui(language, "no_match_intro"), ""]
     lines.extend(f"- {question}" for question in questions)
-    return "\n".join(lines)
+    return "\n".join(lines), False
 
 
 def bump_streak() -> None:
@@ -218,10 +224,10 @@ def bump_streak() -> None:
 
 def deliver(transcript: str, channel: str) -> None:
     language = effective_lang()
-    answer = answer_for(language, transcript)
+    answer, matched = answer_for(language, transcript)
     st.session_state.messages.append({"role": "user", "text": transcript, "channel": channel})
     st.session_state.messages.append({"role": "assistant", "text": answer, "channel": channel})
-    log("answer_shown", channel=channel, matched=not answer.startswith(ui(language, "no_match_intro")))
+    log("answer_shown", channel=channel, matched=matched)
     if channel == "voice" and st.session_state.version == "B":
         bump_streak()
         st.session_state.comfort_open = True
@@ -289,7 +295,8 @@ def apply_mic_event(event: dict) -> None:
         st.session_state.flash = text("cancelled")
         return
     if kind == "error":
-        st.session_state.flash = event.get("message") or text("unsupported")
+        st.session_state.mic_missed = True
+        st.session_state.flash = event.get("message") or text("no_speech")
         return
     if kind != "result":
         return
@@ -298,8 +305,10 @@ def apply_mic_event(event: dict) -> None:
     log("transcript_latency_ms", ms=latency)
     transcript = (event.get("transcript") or "").strip()
     if not transcript:
-        st.session_state.flash = text("unsupported")
+        st.session_state.mic_missed = True
+        st.session_state.flash = text("no_speech")
         return
+    st.session_state.mic_missed = False
     if event.get("alts"):
         alts = event["alts"]
     else:
@@ -362,6 +371,7 @@ def dismiss_prompt() -> None:
 
 
 def open_mic() -> None:
+    st.session_state.mic_missed = False
     if st.session_state.language_choice == "unset":
         if st.session_state.version == "A":
             st.session_state.language_choice = "en"
@@ -508,7 +518,7 @@ def render_sidebar() -> None:
         format_func=lambda code: "Not chosen yet" if code == "unset" else f"{LANGS[code]['label']} · {LANGS[code]['english']}",
         key="language_choice",
     )
-    st.sidebar.radio("Speech", ["Demo", "Real"], horizontal=True, key="speech_mode", help="Demo needs no microphone. Real uses the browser recognizer in Chrome or Edge.")
+    st.sidebar.radio("Speech", ["Real", "Demo"], horizontal=True, key="speech_mode", help="Real listens to the microphone. Demo replays a sample question and does not use the microphone.")
     st.sidebar.toggle("Noisy place", key="noisy", help="Simulates a public ambient-noise bucket. Used only for measurement.")
     st.sidebar.toggle("Earphones in", key="earphones")
     st.sidebar.toggle("Hide review text until tap", key="hide_default")
@@ -625,7 +635,7 @@ def render_listen() -> None:
     if LANGS[effective_lang()]["beta"]:
         st.markdown(f'<div class="gpt-muted">{html.escape(text("beta_note"))}</div>', unsafe_allow_html=True)
     transcript, alts = demo_payload()
-    strings = {key: text(key) for key in ("listening", "hold_hint", "cancel_hint", "hidden_note", "buzz_note", "classic_hint", "unsupported", "mic")}
+    strings = {key: text(key) for key in ("listening", "hearing", "hold_hint", "cancel_hint", "hidden_note", "buzz_note", "classic_hint", "unsupported", "no_speech", "mic")}
     event = MIC(
         mode="quiet" if quiet else "classic",
         demo=st.session_state.speech_mode == "Demo",
@@ -641,6 +651,10 @@ def render_listen() -> None:
     st.caption(text("privacy"))
     if st.session_state.speech_mode == "Demo":
         st.button(text("demo_release"), on_click=release_demo, use_container_width=True)
+    if st.session_state.mic_missed:
+        st.caption(text("samples"))
+        for index, sample in enumerate(SAMPLES[effective_lang()]):
+            st.button(sample["q"], key=f"missed-{index}", on_click=use_sample, args=(sample["q"],), use_container_width=True)
     st.button(text("back"), on_click=go, args=("chat",))
     if remember(event):
         apply_mic_event(event)
@@ -676,13 +690,13 @@ def render_review() -> None:
             )
     st.text_area(text("edit_all"), key="edit_all_text")
     st.button(text("apply_edit"), on_click=apply_edit)
-    st.caption(text("samples"))
-    for index, sample in enumerate(SAMPLES[effective_lang()]):
-        st.button(sample["q"], key=f"sample-{index}", on_click=use_sample, args=(sample["q"],), use_container_width=True)
     send, again, discard = st.columns(3)
     send.button(text("send"), type="primary", on_click=send_review, use_container_width=True)
     again.button(text("rerecord"), on_click=rerecord, use_container_width=True)
     discard.button(text("discard"), on_click=discard_review, use_container_width=True)
+    st.caption(text("samples"))
+    for index, sample in enumerate(SAMPLES[effective_lang()]):
+        st.button(sample["q"], key=f"sample-{index}", on_click=use_sample, args=(sample["q"],), use_container_width=True)
 
 
 def render_speech() -> None:
