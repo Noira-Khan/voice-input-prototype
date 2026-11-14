@@ -13,14 +13,12 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Demo speech is on by default. No microphone and no API key.
+Speech starts on **Real**. Chrome or Edge can use the microphone. No API key. Firefox has no recognizer, so switch Speech to **Demo** in the gear.
 
-1. Stay on Version **B**.
-2. Tap the prompt, pick a language, then hold the mic or press **Release demo whisper**.
-3. Fix the shortened word, hide the text if you want, and send.
-4. Use the gear for Version A, a noisy-place flag, the guardrail badge, and `events.json`.
-
-Chrome or Edge can switch Speech to **Real**. Firefox can stay on Demo.
+1. Stay on Version **B**. The opening screen is the chat. It does not list sample questions.
+2. Tap the mic and pick a language, then hold to speak.
+3. Under the message bar there are two suggestions, one Hindi and one Hinglish. Say one, or something close to any sample question, then review and send.
+4. Use the gear for Version A, Demo speech, a noisy-place flag, the guardrail badge, and `events.json`.
 
 ## Docs
 
@@ -34,6 +32,8 @@ Chrome or Edge can switch Speech to **Real**. Firefox can stay on Demo.
 **B · Quiet push-to-talk.** One language prompt, hold to speak, words hidden, buzz instead of a chime, review before send, then a streak and a comfort check.
 
 **A · Current voice.** No prompt and no review. Words show while you speak. The same sample answers come back, so a difference is the voice flow and not the reply.
+
+The opening screen stays a chat. Two suggestions, one Hindi and one Hinglish, sit under the message bar. The matcher still checks every sample, so a spoken line that is only near one of them returns that answer.
 
 Regional copy is a first-pass beta. It needs a native-speaker review before anyone treats it as final.
 

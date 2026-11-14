@@ -48,7 +48,7 @@ def inject_css() -> None:
           .gpt-top { text-align: center; padding: 4px 0 18px; }
           .gpt-name { font-weight: 650; font-size: 1.05rem; letter-spacing: -0.01em; }
           .gpt-sub { color: #8e8ea0; font-size: .8rem; margin-top: 2px; }
-          .gpt-empty { text-align: center; padding: 18px 12px 8px; }
+          .gpt-empty { text-align: center; padding: 16vh 12px 6vh; }
           .gpt-suggest-label {
             font-size: .78rem; font-weight: 650; letter-spacing: .02em;
             color: #6e6e80; margin: 2px 0 6px;
@@ -146,7 +146,6 @@ def init_state() -> None:
         "flash": None,
         "hide_text": False,
         "hide_text_prev": False,
-        "mic_missed": False,
         "speech_real_default": False,
     }
     for key, value in defaults.items():
@@ -215,6 +214,7 @@ def ask_suggestion(language: str, question: str) -> None:
     st.session_state.messages.append({"role": "assistant", "text": sample["a"], "channel": "sample"})
     log("sample_question_picked", question=question)
     log("answer_shown", channel="sample", matched=True)
+    st.session_state.screen = "chat"
 
 
 def answer_for(language: str, transcript: str) -> tuple[str, bool]:
@@ -307,7 +307,6 @@ def apply_mic_event(event: dict) -> None:
         st.session_state.flash = text("cancelled")
         return
     if kind == "error":
-        st.session_state.mic_missed = True
         st.session_state.flash = event.get("message") or text("no_speech")
         return
     if kind != "result":
@@ -317,10 +316,8 @@ def apply_mic_event(event: dict) -> None:
     log("transcript_latency_ms", ms=latency)
     transcript = (event.get("transcript") or "").strip()
     if not transcript:
-        st.session_state.mic_missed = True
         st.session_state.flash = text("no_speech")
         return
-    st.session_state.mic_missed = False
     if event.get("alts"):
         alts = event["alts"]
     else:
@@ -383,7 +380,6 @@ def dismiss_prompt() -> None:
 
 
 def open_mic() -> None:
-    st.session_state.mic_missed = False
     if st.session_state.language_choice == "unset":
         if st.session_state.version == "A":
             st.session_state.language_choice = "en"
@@ -613,26 +609,20 @@ def render_win() -> None:
         comfortable.button(text("comfortable"), on_click=answer_comfort, args=("comfortable",), use_container_width=True)
 
 
-def render_top_suggestions() -> None:
+def render_few_suggestions() -> None:
+    picks = [(code, SAMPLES[code][0]) for code in ("hi", "hinglish")]
     columns = st.columns(2)
-    for column, code in zip(columns, ("hi", "hinglish")):
-        with column:
-            st.markdown(
-                f'<div class="gpt-suggest-label">{html.escape(LANGS[code]["label"])}</div>',
-                unsafe_allow_html=True,
-            )
-            for index, sample in enumerate(SAMPLES[code]):
-                st.button(
-                    sample["q"],
-                    key=f"suggest-{code}-{index}",
-                    on_click=ask_suggestion,
-                    args=(code, sample["q"]),
-                    use_container_width=True,
-                )
+    for column, (code, sample) in zip(columns, picks):
+        column.button(
+            sample["q"],
+            key=f"suggest-{code}",
+            on_click=ask_suggestion,
+            args=(code, sample["q"]),
+            use_container_width=True,
+        )
 
 
 def render_chat() -> None:
-    render_top_suggestions()
     render_thread()
     if prompt_visible():
         st.markdown(
@@ -648,6 +638,7 @@ def render_chat() -> None:
     mic.button("🎤", help=text("mic"), on_click=open_mic, use_container_width=True)
     if (st.session_state.get("draft") or "").strip():
         st.button(text("send"), type="primary", on_click=send_typed, use_container_width=True)
+    render_few_suggestions()
 
 
 def render_language() -> None:
@@ -682,10 +673,6 @@ def render_listen() -> None:
     st.caption(text("privacy"))
     if st.session_state.speech_mode == "Demo":
         st.button(text("demo_release"), on_click=release_demo, use_container_width=True)
-    if st.session_state.mic_missed:
-        st.caption(text("samples"))
-        for index, sample in enumerate(SAMPLES[effective_lang()]):
-            st.button(sample["q"], key=f"missed-{index}", on_click=use_sample, args=(sample["q"],), use_container_width=True)
     st.button(text("back"), on_click=go, args=("chat",))
     if remember(event):
         apply_mic_event(event)

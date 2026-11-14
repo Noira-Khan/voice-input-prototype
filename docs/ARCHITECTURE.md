@@ -56,7 +56,7 @@ Important keys:
 - `messages` — the thread, including fixed answers
 - `review` — words, alternatives, and latency for the open review
 - `events` — the append-only log
-- `speech_mode` — `Demo` or `Real`
+- `speech_mode` — `Real` or `Demo`. The session opens on Real. Demo replays a sample and does not open the microphone.
 - `noisy`, `earphones`, `hide_default` — measurement and privacy switches
 - `streak`, `streak_date` — Version B reinforcement, local to the session
 
@@ -66,9 +66,29 @@ Widget-backed keys are changed from button callbacks, which Streamlit runs befor
 
 Both arms call `match_answer`. Version B must pass through review before `send_tapped` with `channel=voice`. Version A puts the transcript in the composer and waits for Send. The win banner, the streak, and the comfort check run only in Version B, so the control arm does not receive the reinforcement it is supposed to lack.
 
+## Screens
+
+| Screen | What it shows |
+| --- | --- |
+| `chat` | The thread, the Version B prompt, and the composer. Under the composer, two suggestions: the first Hindi question and the first Hinglish question. |
+| `language` | Language picker, only when none has been chosen yet. |
+| `listen` | The hold or tap control. No suggestion list. |
+| `review` | Version B only. The transcript, word fixes, and the current language’s samples. |
+
+`render_few_suggestions` draws those two buttons and is called only after the message bar. Tapping one returns that fixed answer and logs `sample_question_picked`.
+
 ## Matching
 
-`match_answer` scores the transcript against that language’s samples with `SequenceMatcher`, and also with keyword hits. Two keyword hits are enough for a short code-mixed line such as “aloo pyaaz”. Below the threshold the user sees the sample list, not a generated answer.
+Both arms call `match_answer`. It searches the active language first, then Hindi and Hinglish, then English. The two buttons under the composer are only a hint. Every sample can still match.
+
+The score uses four signals:
+
+- `SequenceMatcher` against the question text. A ratio with no shared words is discounted, so a short unrelated line does not win by accident.
+- Overlap of content words, ignoring fillers such as “mein”, “kya”, and “को”.
+- Keyword hits. Two hits match. One long keyword, such as “photosynthesis”, can match on its own. A keyword may differ by a small spelling change, such as “byaj” and “byaaj”.
+- A nearest-question rule. If the best score is at least 0.34 and clearly ahead of the next sample, that answer is returned even when it is under the 0.42 threshold.
+
+An unrelated line still gets the sample list for the active language, not a generated answer. “aloo pyaaz se kya bana sakte hain” answers the potato question. “hello how are you” does not.
 
 ## Measurement
 
@@ -82,7 +102,8 @@ Both arms call `match_answer`. Version B must pass through review before `send_t
 | Hold was under half a second | “Hold a little longer.” Nothing is logged as a send. |
 | Slide up or Escape | Cancel event. The whisper screen stays up. |
 | Empty real transcript | A plain error, no review, no send. |
-| Question outside the sample set | The list of sample questions. |
+| Question only near a suggestion | That suggestion’s fixed answer. |
+| Question outside the sample set | The list of sample questions for the active language. |
 | Recognizer returns one hypothesis | Review still opens. Edit-all is the fix path. |
 
 ## What this is not
